@@ -52,7 +52,7 @@ impl Device {
             name[4..].parse()?
         } else {
             0
-        };
+        } + 1;
 
         if config.layer.filter(|l| *l != Layer::L3).is_some() {
             return Err(Error::UnsupportedLayer);
