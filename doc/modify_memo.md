@@ -1,13 +1,18 @@
 # 更新说明
 
 ## 读写分离
-### configuration.rs
+
+### 修改Cargo.toml
+升级部分组件
+
+
+### 修改configuration.rs
 添加 read_fd 和 write_fd 到  Configuration 结构中
 其中 read_fd  和 write_fd 相同时 和旧有代码兼容
 注意：在使用读写分离时,read_fd与raw_fd相同
 
 
-### platform/ios/device.rs
+### 修改 platform/ios/device.rs
 
 #### Queue结构更改
 添加 read_tun write_tun
@@ -24,5 +29,16 @@
 使用 Queue的Read 和 Write 而不是向原来一样直接使用queue中间的tun来Read Write
 
 
+##### 修改pub fn split(self) 
 
-#### 也许可以直接修改Fd
+##### 修改 Traits Read Write 
+
+##### 注意！！！ Traits AsRawFd IntoRawFd
+还是用的tun的 ，也就是旧代码。
+这里有一个没有好的办法的更改， 我删掉了Queue的 AsRawFd IntoRawFd Traits
+
+##### 注意！！！ 修改async/device.rs
+我删除了IOS下的AsyncQueue
+
+##### 注意！！！ 修改async/mod.rs
+我删除了IOS下的AsyncQueue

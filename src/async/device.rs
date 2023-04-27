@@ -105,10 +105,11 @@ impl AsyncWrite for AsyncDevice {
 }
 
 /// An async TUN device queue wrapper around a TUN device queue.
+#[cfg(not(target_os = "ios"))]
 pub struct AsyncQueue {
     inner: AsyncFd<Queue>,
 }
-
+#[cfg(not(target_os = "ios"))]
 impl AsyncQueue {
     /// Create a new `AsyncQueue` wrapping around a `Queue`.
     pub fn new(queue: Queue) -> io::Result<AsyncQueue> {
@@ -134,7 +135,7 @@ impl AsyncQueue {
         Framed::new(self, codec)
     }
 }
-
+#[cfg(not(target_os = "ios"))]
 impl AsyncRead for AsyncQueue {
     fn poll_read(
         mut self: Pin<&mut Self>,
@@ -151,7 +152,7 @@ impl AsyncRead for AsyncQueue {
         }
     }
 }
-
+#[cfg(not(target_os = "ios"))]
 impl AsyncWrite for AsyncQueue {
     fn poll_write(
         mut self: Pin<&mut Self>,

@@ -21,8 +21,11 @@ async fn main() {
     let mut config = Configuration::default();
 
     config
-        .address((10, 0, 0, 1))
+        .name("utun10")
+        .address((10, 10, 0, 2))
         .netmask((255, 255, 255, 0))
+        .destination((10,10,0,1))
+
         .up();
 
     #[cfg(target_os = "linux")]
@@ -34,12 +37,14 @@ async fn main() {
 
     let mut framed = dev.into_framed();
 
-    while let Some(packet) = framed.next().await {
+    while let Some(packet) = framed.next().await { //这里是外部发给tun的
+
         match packet {
             Ok(pkt) => match ip::Packet::new(pkt.get_bytes()) {
                 Ok(ip::Packet::V4(pkt)) => match icmp::Packet::new(pkt.payload()) {
                     Ok(icmp) => match icmp.echo() {
                         Ok(icmp) => {
+                            println!("echo!");
                             let reply = ip::v4::Builder::default()
                                 .id(0x42)
                                 .unwrap()
@@ -63,9 +68,9 @@ async fn main() {
                                 .unwrap()
                                 .build()
                                 .unwrap();
-                            framed.send(TunPacket::new(reply)).await.unwrap();
+                            framed.send(TunPacket::new(reply)).await.unwrap(); //这里是发送给外部
                         }
-                        _ => {}
+                        _ => {  println!("other echo!");}
                     },
                     _ => {}
                 },

@@ -20,7 +20,10 @@ use crate::configuration::Configuration;
 use crate::platform::create;
 
 mod device;
-pub use self::device::{AsyncDevice, AsyncQueue};
+pub use self::device::AsyncDevice;
+
+#[cfg(not(target_os = "ios"))]
+pub use self::device::AsyncQueue;
 
 mod codec;
 pub use self::codec::{TunPacket, TunPacketCodec};

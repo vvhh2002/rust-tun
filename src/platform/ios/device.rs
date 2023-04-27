@@ -64,9 +64,22 @@ impl Device {
     }
 
     /// Split the interface into a `Reader` and `Writer`.
+    // pub fn split(self) -> (posix::Reader, posix::Writer) {
+    //     let fd = Arc::new(self.queue.tun);
+    //     (posix::Reader(fd.clone()), posix::Writer(fd.clone()))
+    // }
+
+    /// Split the interface into a `Reader` and `Writer`.
+    ///
     pub fn split(self) -> (posix::Reader, posix::Writer) {
-        let fd = Arc::new(self.queue.tun);
-        (posix::Reader(fd.clone()), posix::Writer(fd.clone()))
+        if self.queue.write_tun.as_raw_fd() == self.queue.read_tun.as_raw_fd() {
+            let fd = Arc::new(self.queue.tun);
+            (posix::Reader(fd.clone()), posix::Writer(fd.clone()))
+        } else {
+            let read_fd = Arc::new(self.queue.read_tun);
+            let write_fd = Arc::new(self.queue.write_tun);
+            (posix::Reader(read_fd), posix::Writer(write_fd))
+        }
     }
 
     /// Return whether the device has packet information
@@ -112,6 +125,8 @@ impl Write for Device {
         self.queue.flush()
     }
 }
+
+
 
 impl D for Device {
     type Queue = Queue;
@@ -177,17 +192,17 @@ impl D for Device {
     }
 }
 
-// impl AsRawFd for Device {
-//     fn as_raw_fd(&self) -> RawFd {
-//         self.queue.as_raw_fd()
-//     }
-// }
-//
-// impl IntoRawFd for Device {
-//     fn into_raw_fd(self) -> RawFd {
-//         self.queue.into_raw_fd()
-//     }
-// }
+impl AsRawFd for Device {
+    fn as_raw_fd(&self) -> RawFd {
+        self.queue.tun.as_raw_fd()
+    }
+}
+
+impl IntoRawFd for Device {
+    fn into_raw_fd(self) -> RawFd {
+        self.queue.tun.into_raw_fd()
+    }
+}
 
 pub struct Queue {
     tun: Fd,
@@ -204,10 +219,12 @@ impl Queue {
     #[cfg(feature = "async")]
     pub fn set_nonblock(&self) -> io::Result<()> {
         if self.write_tun.as_raw_fd() == self.read_tun.as_raw_fd() {
-            self.tun.set_nonblock();
+            self.tun.set_nonblock()
         }else{
-            self.write_tun.set_nonblock();
-            self.read_tun.set_nonblock();
+            if let Err(e)=self.write_tun.set_nonblock(){
+                return Err(e);
+            }
+            self.read_tun.set_nonblock()
         }
 
     }

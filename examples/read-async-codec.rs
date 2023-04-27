@@ -44,6 +44,7 @@ async fn main() {
     let mut config = tun::Configuration::default();
 
     config
+        .name("utun10")
         .address((10, 0, 0, 1))
         .netmask((255, 255, 255, 0))
         .up();
