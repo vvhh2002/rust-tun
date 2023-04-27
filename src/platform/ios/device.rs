@@ -31,18 +31,36 @@ pub struct Device {
 impl Device {
     /// Create a new `Device` for the given `Configuration`.
     pub fn new(config: &Configuration) -> Result<Self> {
-        let fd = match config.raw_fd {
-            Some(raw_fd) => raw_fd,
-            _ => return Err(Error::InvalidConfig),
-        };
-        let mut device = unsafe {
-            let tun = Fd::new(fd).map_err(|_| io::Error::last_os_error())?;
-
-            Device {
-                queue: Queue { tun: tun },
-            }
-        };
-        Ok(device)
+        if let Some(read_fd)=config.read_fd {
+            //这里忽略了原来的raw_fd
+            let write_fd= match config.write_fd {
+                Some(write_raw_fd) => write_raw_fd,
+                _ => return Err(Error::InvalidConfig),
+            };
+            let mut device = unsafe {
+                let tun = Fd::new(read_fd).map_err(|_| io::Error::last_os_error())?;
+                let read_tun = Fd::new(read_fd).map_err(|_| io::Error::last_os_error())?;
+                let write_tun = Fd::new(write_fd).map_err(|_| io::Error::last_os_error())?;
+                Device {
+                    queue: Queue { tun, read_tun, write_tun},
+                }
+            };
+            Ok(device)
+        } else {
+            let fd= match config.raw_fd {
+                Some(raw_fd) => raw_fd,
+                _ => return Err(Error::InvalidConfig),
+            };
+            let mut device = unsafe {
+                let tun = Fd::new(fd).map_err(|_| io::Error::last_os_error())?;
+                let read_tun = Fd::new(fd).map_err(|_| io::Error::last_os_error())?;
+                let write_tun = Fd::new(fd).map_err(|_| io::Error::last_os_error())?;
+                Device {
+                    queue: Queue { tun, read_tun, write_tun},
+                }
+            };
+            Ok(device)
+        }
     }
 
     /// Split the interface into a `Reader` and `Writer`.
@@ -62,19 +80,36 @@ impl Device {
     }
 }
 
+// impl Read for Device {
+//     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+//         self.queue.tun.read(buf)
+//     }
+// }
+//
+// impl Write for Device {
+//     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+//         self.queue.tun.write(buf)
+//     }
+//
+//     fn flush(&mut self) -> io::Result<()> {
+//         self.queue.tun.flush()
+//     }
+// }
+
+
 impl Read for Device {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.queue.tun.read(buf)
+        self.queue.read(buf)
     }
 }
 
 impl Write for Device {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.queue.tun.write(buf)
+        self.queue.write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.queue.tun.flush()
+        self.queue.flush()
     }
 }
 
@@ -142,20 +177,22 @@ impl D for Device {
     }
 }
 
-impl AsRawFd for Device {
-    fn as_raw_fd(&self) -> RawFd {
-        self.queue.as_raw_fd()
-    }
-}
-
-impl IntoRawFd for Device {
-    fn into_raw_fd(self) -> RawFd {
-        self.queue.into_raw_fd()
-    }
-}
+// impl AsRawFd for Device {
+//     fn as_raw_fd(&self) -> RawFd {
+//         self.queue.as_raw_fd()
+//     }
+// }
+//
+// impl IntoRawFd for Device {
+//     fn into_raw_fd(self) -> RawFd {
+//         self.queue.into_raw_fd()
+//     }
+// }
 
 pub struct Queue {
     tun: Fd,
+    read_tun:Fd,
+    write_tun:Fd,
 }
 
 impl Queue {
@@ -166,34 +203,55 @@ impl Queue {
 
     #[cfg(feature = "async")]
     pub fn set_nonblock(&self) -> io::Result<()> {
-        self.tun.set_nonblock()
+        if self.write_tun.as_raw_fd() == self.read_tun.as_raw_fd() {
+            self.tun.set_nonblock();
+        }else{
+            self.write_tun.set_nonblock();
+            self.read_tun.set_nonblock();
+        }
+
     }
 }
 
-impl AsRawFd for Queue {
-    fn as_raw_fd(&self) -> RawFd {
-        self.tun.as_raw_fd()
-    }
-}
-
-impl IntoRawFd for Queue {
-    fn into_raw_fd(self) -> RawFd {
-        self.tun.into_raw_fd()
-    }
-}
+// impl AsRawFd for Queue {
+//     fn as_raw_fd(&self) -> RawFd {
+//         self.tun.as_raw_fd()
+//     }
+// }
+//
+// impl IntoRawFd for Queue {
+//     fn into_raw_fd(self) -> RawFd {
+//         self.tun.into_raw_fd()
+//     }
+// }
 
 impl Read for Queue {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.tun.read(buf)
+        if self.write_tun.as_raw_fd() == self.read_tun.as_raw_fd() {
+            self.tun.read(buf)
+        } else {
+            self.read_tun.read(buf)
+        }
     }
 }
 
 impl Write for Queue {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.tun.write(buf)
+        if self.write_tun.as_raw_fd() == self.read_tun.as_raw_fd() {
+            self.tun.write(buf)
+        } else {
+            self.write_tun.write(buf)
+        }
+
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.tun.flush()
+        if self.write_tun.as_raw_fd() == self.read_tun.as_raw_fd() {
+            self.tun.flush()
+        } else {
+            self.write_tun.flush()
+            // self.read_tun.flush(); //read 不用 flush
+        }
+
     }
 }

@@ -46,6 +46,8 @@ pub struct Configuration {
     pub(crate) layer: Option<Layer>,
     pub(crate) queues: Option<usize>,
     pub(crate) raw_fd: Option<RawFd>,
+    pub(crate) read_fd: Option<RawFd>,
+    pub(crate) write_fd: Option<RawFd>,
 }
 
 impl Configuration {
@@ -121,6 +123,21 @@ impl Configuration {
     /// Set the raw fd.
     pub fn raw_fd(&mut self, fd: RawFd) -> &mut Self {
         self.raw_fd = Some(fd);
+        self.write_fd = Some(fd);
+        self.read_fd = Some(fd);
+        self
+    }
+
+    /// Set the read fd. default read fd as old version raw_fd
+    pub fn read_fd(&mut self, fd: RawFd) -> &mut Self {
+        self.read_fd=Some(fd);
+        self.raw_fd = Some(fd);
+        self
+    }
+
+    /// Set the write fd.
+    pub fn write_fd(&mut self, fd: RawFd) -> &mut Self {
+        self.write_fd=Some(fd);
         self
     }
 }
